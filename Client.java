@@ -10,14 +10,14 @@ import java.util.Objects;
 import java.util.Scanner;
 
 public class Client extends Thread {
-    private Socket socket;
+    private final Socket socket;
     private InputStream is;
     private OutputStream os;
-    private ChartList chats;
+    private final ChartList chats;
     private Chat chat;
     private String nick;
-    private Scanner in;
-    private PrintStream out;
+    private final Scanner in;
+    private final PrintStream out;
 
     public Client(Socket socket, ChartList chats) {
         this.socket = socket;
@@ -38,63 +38,73 @@ public class Client extends Thread {
 
     @Override
     public void run() {
-        while (true) {
-            //ToDo приветствие и список чатов out.println
-            out.println("Welcome!!!");
+        try {
             while (true) {
-                // Вывод списка чатов
-                out.println("List of chats: ");
-                for (Chat i : chats.getChatSet()) {
-                    out.println(i.getName());
-                }
-                // Выбор чата
-                out.print("Please choose chat: ");
-                String inputChat = in.nextLine();
-                if (inputChat.equals("exit")) break;
-                out.print("Please choose nack: ");
-                nick = in.nextLine();
-                if (nick.equals("exit")) break;
-                // добавление клиента в чат с проверкой
-                try {
-                    // .. удаление из текущего чата
-                    chats.findChart(chat).getClients().remove(this);
-                    chat = null;
-                } catch (NullPointerException | NoSuchElementException e) {
-                } finally {
+                out.println("Welcome!!!");
+                while (true) {
+                    // Вывод списка чатов
+                    out.println("List of chats: ");
+                    for (Chat i : chats.getChatSet()) {
+                        out.println(i.getName());
+                    }
+                    // Выбор чата
+                    out.print("Please choose chat: ");
+                    String inputChat = in.nextLine();
+                    if (inputChat.equals("exit")) break;
+                    out.print("Please choose nick: ");
+                    nick = in.nextLine();
+                    if (nick.equals("exit")) break;
+                    // добавление клиента в чат с проверкой
                     try {
-                        // .. добавление в новый чат
-                        chat = chats.findChart(new Chat(inputChat));
-                        // .. ToDo тут нужна блокировка
-                        if (chat.getClients().contains(this)) throw new DuplicateRequestException();
-                        else chat.getClients().add(this);
-                        // .. клиент добавлен успешно
-                        out.println("You added to chat " + chat.getName());
-                        out.println("Send message: ");
-                        while (true) {
-                            String message = in.nextLine();
-                            if (message.equals("exit")) break;
-                            else chat.addMessage(new Chat.Node(this, message));
+                        // .. удаление из текущего чата
+                        chats.findChart(chat).getClients().remove(this);
+                        chat = null;
+                    } catch (NullPointerException | NoSuchElementException e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            // .. добавление в новый чат
+                            chat = chats.findChart(new Chat(inputChat));
+                            // .. ToDo тут нужна блокировка
+                            if (nick.equals("")) throw new NullPointerException();
+                            if (chat.getClients().contains(this)) throw new DuplicateRequestException();
+                            else chat.getClients().add(this);
+                            // .. клиент добавлен успешно
+                            out.println("You added to chat " + chat.getName());
+                            out.println("Send message: ");
+                            while (true) {
+                                String message = in.nextLine();
+                                if (message.equals("exit")) break;
+                                else chat.addMessage(new Chat.Node(this, message));
+                            }
+                        } catch (NullPointerException e) {
+                            e.printStackTrace();
+                            if (nick.equals(""))
+                                out.println("nick can't be null");
+                            else
+                                out.println("not found chat with name \"%s\"".formatted(inputChat));
+                            chat = null;
+                        } catch (DuplicateRequestException e) {
+                            e.printStackTrace();
+                            out.println("User %s is already in chat %s".formatted(nick, chat.getName()));
+                            chat = null;
+                            nick = null;
                         }
-                    } catch (NullPointerException e) {
-                        out.println("not found chat with name \"%s\"".formatted(inputChat));
-                        chat = null;
-                    } catch (DuplicateRequestException e) {
-                        out.println("User %s is already in chat %s".formatted(nick, chat.getName()));
-                        chat = null;
-                        nick = null;
                     }
                 }
-            }
-            interrupt();
-            try {
+                interrupt();
                 sleep(1);
-            } catch (InterruptedException e) {
-                try {
-                    socket.close();
-                } catch (IOException ex) {
-                    System.out.println(e.getMessage());
-                }
-                System.out.println("Client disconnected "); return;}
+            }
+        } catch(InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException ex) {
+                System.out.println(ex.getMessage());
+            }
+            System.out.println("Client disconnected ");
+            return;
         }
     }
 
